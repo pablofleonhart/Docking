@@ -73,6 +73,22 @@ class PDBAligner:
 
         return solution
 
+    def align( self, transformation, mob_atoms ):
+        translation = np.matrix([transformation[0:3]]*len(mob_atoms))
+        rot = transformation[3:6]
+        
+        rotX = np.matrix([[1.0, 0.0, 0.0], [0.0, math.cos(rot[0]), -math.sin(rot[0])], [0.0, math.sin(rot[0]), math.cos(rot[0])]])
+        rotY = np.matrix([[math.cos(rot[1]), 0.0, math.sin(rot[1])], [0.0, 1.0, 0.0], [-math.sin(rot[1]), 0.0, math.cos(rot[1])]])
+        rotZ = np.matrix([[math.cos(rot[2]), -math.sin(rot[2]), 0.0], [math.sin(rot[2]), math.cos(rot[2]), 0.0], [0.0, 0.0, 1.0]])
+        rotXYZ = rotZ * rotY * rotX
+
+        transformed_atoms = np.matrix(copy.deepcopy(mob_atoms))
+        transformed_atoms = transformed_atoms + translation
+        transformed_atoms = transformed_atoms * rotXYZ.transpose()
+       
+        transformed_atoms = np.matrix.tolist(transformed_atoms)
+        return transformed_atoms
+
     def calcRMSD( self, reference, solution ):
         #print solution
         sumDistance = 0

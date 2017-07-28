@@ -9,25 +9,44 @@ import math
 from scipy.stats import norm
 import copy
 from pdbAligner import PDBAligner
+from pdbReader import PDBReader
 from aminoPhiPsi import AminoPhiPsi
-import rmsd
 from funcEnergy import EnergyFunction
+import rmsd
 
 def evals( acor, c ):
     return acor.evaluator( c )
 
 class ACOR:
-    pdbPattern = "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}"
+    pdbPattern = "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s} {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}"
+    NHC_ATOMS = ("N", "H", "1H", "H1", "2H", "H2", "3H", "H3", "CA")
+    generations = []
+    values = []
+    mod = []
+    experimental = None
+    modified = None
+    # maximization or minimization problem
+    maximize = False
+
+    # variables
+    parameters = None
+    # number of variables
+    numVar = 0
     # size of solution archive
-    sizeSolutions = 50
+    sizeSolutions = 200
     # number of ants
-    numAnts = 25
+    numAnts = 150
     # parameter self.q
-    q = 0.0001
+    q = 0.001
     # standard deviation
     qk = q * sizeSolutions
     # parameter self.xi (like pheromone evaporation)
     xi = 0.85
+    # maximum iterations
+    maxIterations = 5
+    # bounds of variables
+    upperBound = []
+    lowerBound = []
 
     def __init__( self, exp, mod, variables, maximization, iterations ):
         self.experimental = exp
@@ -38,13 +57,22 @@ class ACOR:
         self.maxIterations = iterations
         self.upperBound = [1] * self.numVar
         self.lowerBound = [0] * self.numVar
-        self.generations = []
-        self.energies = []
-        self.rmsds = []
-        self.mod = []
 
-    def calcKabschRMSD( self, mod ):
-        P = np.array( self.experimental.posAtoms )
+        refFile = open( "config.txt", "r")
+        var = True
+        while var:
+            bufferLine = refFile.readline().split()
+            if(bufferLine[0] == "size_x"):
+                self.size_X = float(bufferLine[2])
+            if(bufferLine[0] == "size_y"):
+                self.size_Y = float(bufferLine[2])
+            if(bufferLine[0] == "size_z"):
+                self.size_Z = float(bufferLine[2])
+            if(bufferLine[0] == "out"):
+                var = False
+
+    def calcKabschRMSD( self, exp, mod ):
+        P = np.array( exp )
         self.q = np.array( mod )
         P -= rmsd.centroid( P )
         self.q -= rmsd.centroid( self.q )
@@ -52,8 +80,12 @@ class ACOR:
         return result
 
     def evaluator( self, x ):
-        rotation = [ ( 2 * math.pi * i ) - math.pi for i in x ]
-        rotation = np.hstack( ( 0.0, rotation, 0.0 ) )
+        tranformation = [ ( ( math.pi/2 ) * i ) - ( math.pi/4 ) for i in x ]
+        tranformation[0] = ( self.size_X * x[0] ) - ( self.size_X/2.0 )
+        tranformation[1] = ( self.size_Y * x[1] ) - ( self.size_Y/2.0 )
+        tranformation[2] = ( self.size_Z * x[2] ) - ( self.size_Z/2.0 )
+        tranformation[3] = ( 2 * math.pi * x[3] ) - math.pi
+        '''rotation = np.hstack( ( 0.0, rotation, 0.0 ) )
         rotation = [rotation[i:i+2] for i in range( 0, len( rotation ), 2 )]
 
         app = AminoPhiPsi( "1L2Y-P.pdb" )        
@@ -61,15 +93,17 @@ class ACOR:
         #print app.pdb.posAtoms
         app.adjustPhiPsi( rotation )
 
-        '''print app.pdb.atoms
         fitness = self.calcKabschRMSD( app.pdb.posAtoms )'''
-        fe = EnergyFunction( app.pdb )
-        fitness = fe.getEnergy()
+        energy = EnergyFunction()
+        energy.transform( tranformation[0], tranformation[1], tranformation[2], tranformation[3], tranformation[4], tranformation[5], tranformation[6], \
+                          tranformation[7], tranformation[8], tranformation[9], tranformation[10], tranformation[11], tranformation[12], tranformation[13], 'ligand.pdbqt' )
+
+        fitness = energy.getEnergy()
         #print fitness
         return fitness
 
     def multiprocessEvaluator( self, x ):
-        nprocs = 8
+        nprocs = 1
         pool = multiprocessing.Pool( processes = nprocs )
         results = [pool.apply_async( evals, [self, c] ) for c in x]
         pool.close()
@@ -185,44 +219,28 @@ class ACOR:
             #print best_sol[0][0:len( self.parameters )]
             print "Fitness:", solutions[0][:][len( self.parameters )]
             self.generations.append( iterations )
-            self.energies.append( solutions[0][:][len( self.parameters )] )            
+            self.energies.append( solutions[0][:][len( self.parameters )] ) 
 
-            rotation = [ (2*math.pi*i)-math.pi for i in best_sol[0][0:len( self.parameters )] ]
-            rotation.append( 0.0 )
+            x = solutions[0][0:len(self.parameters)]
+            tranformation = [ ( ( math.pi/2 ) * i ) - ( math.pi/4 ) for i in x ]
+            tranformation[0] = ( self.size_X * x[0] ) - ( self.size_X/2.0 )
+            tranformation[1] = ( self.size_Y * x[1] ) - ( self.size_Y/2.0 )
+            tranformation[2] = ( self.size_Z * x[2] ) - ( self.size_Z/2.0 )
+            tranformation[3] = ( 2 * math.pi * x[3] ) - math.pi
 
-            rt = []
-            rt.append( 0.0 )
-            for i in xrange( len( rotation ) ):
-                rt.append( rotation[i] )
+            print tranformation
+            energy = EnergyFunction()
+            energy.transform( tranformation[0], tranformation[1], tranformation[2], tranformation[3], tranformation[4], tranformation[5], tranformation[6], \
+                              tranformation[7], tranformation[8], tranformation[9], tranformation[10], tranformation[11], tranformation[12], tranformation[13], 'ligand.pdbqt' )
 
-            rotation = [rt[i:i+2] for i in range( 0, len( rt ), 2 )]
+            print energy.getEnergy()
 
-            app = AminoPhiPsi( "1L2Y-P.pdb" )
-            app.pdb.adjustAtoms( self.experimental.atoms, self.experimental.aminoAcids )
-            #print rotation
-            app.adjustPhiPsi( rotation )
-            rm = self.calcKabschRMSD( app.pdb.posAtoms )
-            print "RMSD", rm
+            exp = PDBReader( "orig_ligand.pdbqt" )
+            modified = PDBReader( "ligand.pdbqt" )
+
+            rm = self.calcKabschRMSD( exp.posAtoms, modified.posAtoms )
+
             self.rmsds.append( rm )
-
-            if iterations%step == 0:                
-                mod = app.pdb.posAtoms
-
-                pdbNew = open( "1L2Y-F" + str( iterations ) + ".pdb", "w" )
-                countTotal = 1
-                acid = 0
-                aa = None
-                for z in range( 0, len( self.modified.atoms ) ):
-                    if self.modified.aminoAcids[z] != aa:
-                        aa = self.modified.aminoAcids[z]
-                        acid += 1
-                    pdbNew.write( self.pdbPattern.format( "ATOM", countTotal, str( self.modified.atoms[z] ), " ", str( self.modified.aAcids[z] ), " ", \
-                                  acid, " ", float( mod[z][0] ), float( mod[z][1] ), float( mod[z][2] ), float( 1.00 ), float( 0.0 ), "", "" ) + "\n" )
-
-                    countTotal += 1
-
-                pdbNew.write( "TER\n" )
-                pdbNew.close() 
 
             iterations += 1
 
@@ -233,29 +251,42 @@ class ACOR:
         print "Fitness:", best_sol[0][-1]
 
         print self.generations
+        print self.values
+
+        x = best_sol[0][0:len(self.parameters)]
+        tranformation = [ ( ( math.pi/2 ) * i ) - ( math.pi/4 ) for i in x ]
+        tranformation[0] = ( self.size_X * x[0] ) - ( self.size_X/2.0 )
+        tranformation[1] = ( self.size_Y * x[1] ) - ( self.size_Y/2.0 )
+        tranformation[2] = ( self.size_Z * x[2] ) - ( self.size_Z/2.0 )
+        tranformation[3] = ( 2 * math.pi * x[3] ) - math.pi
+
+        print tranformation
+        energy = EnergyFunction()
+        energy.transform( tranformation[0], tranformation[1], tranformation[2], tranformation[3], tranformation[4], tranformation[5], tranformation[6], \
+                          tranformation[7], tranformation[8], tranformation[9], tranformation[10], tranformation[11], tranformation[12], tranformation[13], 'ligand.pdbqt' )
+
+        print energy.getEnergy()
+
+        exp = PDBReader( "orig_ligand.pdbqt" )
+        modified = PDBReader( "ligand.pdbqt" )
+
+        print self.calcKabschRMSD( exp.posAtoms, modified.posAtoms )
+
+        print self.generations
         print self.energies
         print self.rmsds
-
-        ff = open( "outputs.txt", "w" )
-
-        for i in xrange( len( self.generations ) ):
-            ff.write( str( self.generations[i] ) + " " + str( self.energies[i] ) + " " + str( self.rmsds[i] ) + "\n" )
-        
-        ff.close()
-
-        rotation = [ (2*math.pi*i)-math.pi for i in best_sol[0][0:len( self.parameters )] ]
-        rotation.append( 0.0 )
+        '''rotation.append( 0.0 )
 
         rt = []
         rt.append( 0.0 )
         for i in xrange( len( rotation ) ):
             rt.append( rotation[i] )
 
-        rotation = [rt[i:i+2] for i in range( 0, len( rt ), 2 )]
+        rotation = [rt[i:i+2] for i in range( 0, len( rt ), 2 )]'''
 
-        app = AminoPhiPsi( "1L2Y-P.pdb" )
+        '''app = AminoPhiPsi( "ligand.pdbqt" )
         app.pdb.adjustAtoms( self.experimental.atoms, self.experimental.aminoAcids )
-        #print rotation
+        print rotation
         app.adjustPhiPsi( rotation )
         mod = app.pdb.posAtoms
 
@@ -268,9 +299,9 @@ class ACOR:
                 aa = self.modified.aminoAcids[z]
                 acid += 1
             pdbNew.write( self.pdbPattern.format( "ATOM", countTotal, str( self.modified.atoms[z] ), " ", str( self.modified.aAcids[z] ), " ", \
-                          acid, " ", float( mod[z][0] ), float( mod[z][1] ), float( mod[z][2] ), float( 1.00 ), float( 0.0 ), "", "" ) + "\n" )
+                          acid, " ", float( mod[z][0] ), float( mod[z][1] ), float( mod[z][2] ), float( 1.00 ), float( 0.0 ) ) + "\n" )
 
             countTotal += 1
 
         pdbNew.write( "TER\n" )
-        pdbNew.close()        
+        pdbNew.close()'''

@@ -11,16 +11,16 @@ class EnergyFunction( object ):
 		a = commands.getstatusoutput( './vina --config config.txt --score_only' )
 		energiaVina = string.split( string.split( a[1],"Affinity:" )[1] )[0]
 
-		return energiaVina
+		return float( energiaVina )
 
-	def disturbance( self, deltaX,deltaY, deltaZ, theta_rot,theta1,theta2,theta3,theta4,theta5,theta6,theta7,theta8,theta9,theta10 ):
+	def transform( self, deltaX,deltaY, deltaZ, theta_rot,theta1,theta2,theta3,theta4,theta5,theta6,theta7,theta8,theta9,theta10, fname ):
 		theta=[theta1,theta2,theta3,theta4,theta5,theta6,theta7,theta8,theta9,theta10]
 		k=len(theta)
 		ligand = []
 		vetores = []
 
 		path = ""
-		refFile = open(path+"files/ligand.pdbqt", "r")
+		refFile = open(path+"files/original_ligand.pdbqt", "r")
 		
 		atoms = True
 		while atoms:
@@ -48,7 +48,7 @@ class EnergyFunction( object ):
 			if(ligand[i][0]=="BRANCH"):
 				vetores.append(ligand[i])
 
-		print vetores
+		#print vetores
 		for j in range(len(vetores)): #busca as coordenadas dos vetores de referencia
 			for i in range(len(ligand)):
 				if(len(ligand[i])>2):
@@ -59,11 +59,11 @@ class EnergyFunction( object ):
 						vet2 =  (float(ligand[i][6]),float(ligand[i][7]),float(ligand[i][8]))
 						vetor2.append(vet2)
 
-		print "v1", vetor1, "v2", vetor2
+		#print "v1", vetor1, "v2", vetor2
 		origem = (0.0,0.0,0.0)	
 		for i in range(len(vetor1)): # monta o vetor referencia,
 			vetRef = (vetores[i][1],vetores[i][2],vetor1[i][0]-vetor2[i][0],vetor1[i][1]-vetor2[i][1],vetor1[i][2]-vetor2[i][2])
-			print vetRef
+			#print vetRef
 			for j in range(len(ligand)):
 					if(len(ligand[j])>2):
 						if (ligand[j][0]=="BRANCH" and ligand[j][1]==vetRef[0] and ligand[j][2]==vetRef[1]): #seleciona atomos referentes a cada vetor
@@ -74,7 +74,7 @@ class EnergyFunction( object ):
 							#print k	
 							while(ligand[aux][0]!="ENDBRANCH" and ligand[j][1]==vetRef[0] and ligand[j][2]==vetRef[1]):
 								if(ligand[aux][0]=="HETATM"): #translada, rotaciona e translada novamente cada atamo
-									print ligand[aux]
+									#print ligand[aux]
 									ref = (float(vetor1[i][0]), float(vetor1[i][1]), float(vetor1[i][2]))
 									#print "Referencia: " + str(referencia)
 									matriz = TransladaPraRef([ligand[aux][6], ligand[aux][7], ligand[aux][8]], ref, origem)
@@ -164,7 +164,7 @@ class EnergyFunction( object ):
 				ligand[i][9] = "{0:>5}".format(str(ligand[i][9]))
 				ligand[i][11] = "{0:>9}".format(str(ligand[i][11]))
 				
-		arquivo = open('ligand.pdbqt', 'w')
+		arquivo = open( fname, 'w')
 		for i in range(len(ligand)):
 			ligand[i] = '[%s]' % ' '.join(map(str, ligand[i]))
 			arquivo.write((ligand[i][1:-1]))

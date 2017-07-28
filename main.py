@@ -1,7 +1,9 @@
 from funcEnergy import EnergyFunction
 from pdbReader import PDBReader
+from acor import ACOR
 import math
 import numpy as np
+import random
 import rmsd
 import sys
 
@@ -11,23 +13,56 @@ class Builder( object ):
 	mod = None
 
 	def __init__( self ):
-		proteinName = "files/macro.pdb"
-		ligandName = "files/ligand.pdb"
+		proteinName = "files/macro.pdbqt"
+		expName = "orig_ligand.pdbqt"
+		modName = "ligand.pdbqt"
 
 		protein = PDBReader( proteinName )
-		experimental = PDBReader( ligandName )
+		experimental = PDBReader( expName )
+		modified = PDBReader( modName )
 
-		print len( protein.atoms )
-		print len( experimental.atoms )
+		print experimental.posAtoms
 
-		print " DOCKING STARTED "
+		'''print len( protein.atoms )
+		print ( experimental.posAtoms )'''
 
 		e = EnergyFunction()
 		print e.getEnergy()
 
-		params = ['tx', 'ty', 'tz', 'rx', 'ry', 'rz', 'theta1', 'theta2', 'theta3', 'theta4', 'theta5', 'theta6', 'theta7', 'theta8', 'theta9', 'theta10']
-		'''acor = ACOR( self.experimental, self.modified, params, False, 1 )
-		acor.evolve()'''
+		refFile = open( "config.txt", "r")
+		var = True
+		while var:
+			bufferLine = refFile.readline().split()
+			if(bufferLine[0] == "size_x"):
+				size_X = float(bufferLine[2])
+			if(bufferLine[0] == "size_y"):
+				size_Y = float(bufferLine[2])
+			if(bufferLine[0] == "size_z"):
+				size_Z = float(bufferLine[2])
+			if(bufferLine[0] == "out"):
+				var = False
+
+		deltaX = random.uniform(size_X*(-1)/2,size_X/2)
+		deltaY = random.uniform(size_Y*(-1)/2,size_Y/2)
+		deltaZ = random.uniform(size_Z*(-1)/2,size_Z/2)
+		anguloRot = random.uniform(-math.pi, math.pi)
+		theta1 = random.uniform(-math.pi/4, math.pi/4)
+		theta2 = random.uniform(-math.pi/4, math.pi/4)
+		theta3 = random.uniform(-math.pi/4, math.pi/4)
+		theta4 = random.uniform(-math.pi/4, math.pi/4)
+		theta5 = random.uniform(-math.pi/4, math.pi/4)
+		theta6 = random.uniform(-math.pi/4, math.pi/4)
+		theta7 = random.uniform(-math.pi/4, math.pi/4)
+		theta8 = random.uniform(-math.pi/4, math.pi/4)
+		theta9 = random.uniform(-math.pi/4, math.pi/4)
+		theta10 = random.uniform(-math.pi/4, math.pi/4)
+
+		e = EnergyFunction()
+		e.transform( deltaX, deltaY, deltaZ, anguloRot, theta1, theta2, theta3, theta4, theta5, theta6, theta7, theta8, theta9, theta10, 'files/original_ligand.pdbqt' )
+
+		params = ['tx', 'ty', 'tz', 'thetarot', 'theta1', 'theta2', 'theta3', 'theta4', 'theta5', 'theta6', 'theta7', 'theta8', 'theta9', 'theta10']
+		acor = ACOR( self.experimental, self.modified, params, False, 200 )
+		#acor.evolve()
 
 	def readFiles( self, fileA, fileB ):
 		self.experimental = PDBReader( fileA )
