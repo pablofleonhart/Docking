@@ -24,10 +24,10 @@ class Builder( object ):
 		print experimental.posAtoms
 
 		'''print len( protein.atoms )
-		print ( experimental.posAtoms )'''
+		print ( experimental.posAtoms )
 
 		e = EnergyFunction()
-		print e.getEnergy()
+		print e.getEnergy()'''
 
 		refFile = open( "config.txt", "r")
 		var = True
@@ -62,7 +62,7 @@ class Builder( object ):
 
 		params = ['tx', 'ty', 'tz', 'thetarot', 'theta1', 'theta2', 'theta3', 'theta4', 'theta5', 'theta6', 'theta7', 'theta8', 'theta9', 'theta10']
 		acor = ACOR( self.experimental, self.modified, params, False, 200 )
-		#acor.evolve()
+		acor.evolve()
 
 	def readFiles( self, fileA, fileB ):
 		self.experimental = PDBReader( fileA )
